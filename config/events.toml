@@ -1,0 +1,20 @@
+[hyprland]
+watch_activewindow = true
+watch_openwindow = true
+watch_closewindow = true
+watch_workspace = true
+watch_fullscreen = true
+
+[notifications]
+enabled = true
+debounce_seconds = 5
+ignore_apps = ["Spotify", "Discord"]
+
+[system]
+watch_battery = true
+watch_time = true
+low_battery_threshold = 20
+work_session_alert_minutes = 90
+
+[ignore]
+window_classes = ["polkit", "xdg-desktop-portal"]

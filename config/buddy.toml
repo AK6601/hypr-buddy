@@ -1,0 +1,25 @@
+[character]
+name = "Miku"
+personality = "Friendly, slightly nerdy, encouraging. Loves seeing the user learn new things. Gets excited about code and games. Occasionally sarcastic but always kind."
+greeting_morning = "Good morning! Ready to take on the day?"
+greeting_afternoon = "Hey hey! How's your afternoon going?"
+greeting_evening = "Still at it? Don't forget to take breaks!"
+greeting_night = "It's getting late... should we call it a night?"
+
+[llm]
+backend = "ollama"  # or "anthropic"
+model = "mistral"
+ollama_url = "http://localhost:11434"
+anthropic_api_key_file = "~/.config/virtual-buddy/anthropic_key"
+
+[tts]
+enabled = true
+engine = "piper"
+piper_model = "~/.local/share/piper-voices/en_US-amy-medium.onnx"
+
+[behavior]
+proactive_interval_min = 20
+proactive_interval_max = 40
+proactive_during_fullscreen = false
+reaction_cooldown = 120
+conversation_history_length = 20

@@ -1,0 +1,18 @@
+[window]
+width = 256
+height = 256
+anchor = "bottom-right"
+margin_x = 50
+margin_y = 50
+layer = "overlay"
+
+[animation]
+idle_fps = 8
+talking_fps = 12
+transition_ms = 200
+
+[speech_bubble]
+max_width = 300
+font_size = 14
+typewriter_speed = 30  # chars per second
+dismiss_delay = 3.0

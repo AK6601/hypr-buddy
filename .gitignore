@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+
+# Rust
+target/
+Cargo.lock
+
+# System
+.DS_Store
+._*
