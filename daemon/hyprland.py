@@ -61,8 +61,11 @@ class HyprlandMonitor:
             "closewindow": hypr_config.get("watch_closewindow", True),
             "workspace": hypr_config.get("watch_workspace", True),
             "fullscreen": hypr_config.get("watch_fullscreen", True),
+            "movewindow": True,
+            "resizewindow": True,
         }
         self._ignore_classes: set[str] = set(ignore_config.get("window_classes", []))
+        self._active_addr: str | None = None
 
     async def run(self) -> None:
         """Main loop: connect to Hyprland socket and process events."""
@@ -93,6 +96,31 @@ class HyprlandMonitor:
 
             await asyncio.sleep(5)
 
+    async def _get_active_window_geometry(self) -> dict | None:
+        """Fetch current active window geometry using hyprctl."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "hyprctl", "activewindow", "-j",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await proc.communicate()
+            if proc.returncode == 0:
+                import json
+                data = json.loads(stdout.decode())
+                if "at" in data and "size" in data:
+                    self._active_addr = data.get("address")
+                    return {
+                        "address": self._active_addr,
+                        "x": data["at"][0],
+                        "y": data["at"][1],
+                        "w": data["size"][0],
+                        "h": data["size"][1],
+                    }
+        except Exception as e:
+            logger.debug("Failed to get window geometry: %s", e)
+        return None
+
     async def _handle_line(self, line: str) -> None:
         """Parse a single Hyprland event line and forward if relevant."""
         if ">>" not in line:
@@ -107,12 +135,42 @@ class HyprlandMonitor:
             title = parts[1] if len(parts) > 1 else ""
 
             if app_class in self._ignore_classes:
+                self._active_addr = None
                 return
+
+            # Fetch geometry
+            geo = await self._get_active_window_geometry()
 
             await self._sender.send(DesktopEvent(
                 type=EventType.WINDOW_FOCUS,
-                data={"app_class": app_class, "title": title},
+                data={
+                    "app_class": app_class,
+                    "title": title,
+                    "geometry": geo,
+                },
             ))
+
+        elif event_name == "movewindow" and self._watch.get("movewindow"):
+            # Format: movewindow>>ADDR,WORKSPACE
+            addr = data.split(",")[0]
+            if self._active_addr and addr == self._active_addr:
+                geo = await self._get_active_window_geometry()
+                if geo:
+                    await self._sender.send(DesktopEvent(
+                        type=EventType.WINDOW_MOVE,
+                        data={"geometry": geo},
+                    ))
+
+        elif event_name == "resizewindow" and self._watch.get("resizewindow"):
+            # Format: resizewindow>>ADDR,W H
+            addr = data.split(",")[0]
+            if self._active_addr and addr == self._active_addr:
+                geo = await self._get_active_window_geometry()
+                if geo:
+                    await self._sender.send(DesktopEvent(
+                        type=EventType.WINDOW_RESIZE,
+                        data={"geometry": geo},
+                    ))
 
         elif event_name == "openwindow" and self._watch.get("openwindow"):
             # Format: openwindow>>ADDR,WORKSPACE,CLASS,TITLE
