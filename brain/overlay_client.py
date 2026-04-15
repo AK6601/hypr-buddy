@@ -12,7 +12,7 @@ import asyncio
 import json
 import logging
 
-from ipc.protocol import OverlayCommand, set_state, say, hide, show, quit_overlay
+from ipc.protocol import OverlayCommand, set_state, say, hide, show, quit_overlay, move
 
 logger = logging.getLogger("hypr-buddy.brain.overlay")
 
@@ -24,6 +24,15 @@ class OverlayClient:
         self._socket_path = socket_path
         self._writer: asyncio.StreamWriter | None = None
         self._lock = asyncio.Lock()
+
+    async def wait_ready(self, timeout: float = 10.0) -> bool:
+        """Wait for the overlay to become available."""
+        start = asyncio.get_event_loop().time()
+        while asyncio.get_event_loop().time() - start < timeout:
+            if await self._connect():
+                return True
+            await asyncio.sleep(0.5)
+        return False
 
     async def _connect(self) -> bool:
         try:
@@ -62,6 +71,9 @@ class OverlayClient:
 
     async def show(self) -> bool:
         return await self._send(show())
+
+    async def move_to(self, x: int, y: int) -> bool:
+        return await self._send(move(x, y))
 
     async def close(self) -> None:
         if self._writer:
