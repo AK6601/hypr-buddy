@@ -41,13 +41,14 @@ use sctk::shell::wlr_layer::{
     Anchor, KeyboardInteractivity, Layer, LayerShell, LayerShellHandler, LayerSurface,
     LayerSurfaceConfigure,
 };
+use sctk::shell::WaylandSurface;
 use sctk::shm::slot::SlotPool;
 use sctk::shm::{Shm, ShmHandler};
 use sctk::{
     delegate_compositor, delegate_layer, delegate_output, delegate_registry, delegate_seat,
     delegate_shm,
 };
-use wayland_client::globals::registry_queue_handle;
+use wayland_client::globals::registry_queue_init;
 use wayland_client::protocol::{wl_output, wl_seat, wl_shm, wl_surface};
 use wayland_client::{Connection, QueueHandle};
 
@@ -89,6 +90,10 @@ struct BuddyApp {
     renderer: ShmRenderer,
     current_state: String,
     revert_state: Option<(String, Instant)>,
+    current_x: f64,
+    current_y: f64,
+    target_x: f64,
+    target_y: f64,
     visible: bool,
     needs_redraw: bool,
     exit: bool,
@@ -128,11 +133,15 @@ impl BuddyApp {
                     .transition_to(&self.current_state, self.config.animation.transition_ms);
                 self.needs_redraw = true;
             }
-            IpcCommand::Move { .. } => {
-                // Repositioning a layer-shell surface requires reconfiguring margins.
-                // For now, this is a no-op; a future version could destroy and
-                // recreate the layer surface with new margins.
-                info!("Move command received (not yet supported for layer-shell)");
+            IpcCommand::Move { x, y } => {
+                info!("Target Move to: {}, {}", x, y);
+                self.target_x = x as f64;
+                self.target_y = y as f64;
+                // If this is the first move, teleport immediately
+                if self.current_x == 0.0 && self.current_y == 0.0 {
+                    self.current_x = self.target_x;
+                    self.current_y = self.target_y;
+                }
             }
             IpcCommand::Visibility { visible } => {
                 info!("Visibility: {}", visible);
@@ -150,7 +159,52 @@ impl BuddyApp {
     fn tick(&mut self) -> bool {
         let now = Instant::now();
         let dt = now.duration_since(self.last_frame);
+        self.last_frame = now;
 
+        // --- 1. Movement Logic ---
+        // Smooth movement interpolation (lerp)
+        let lerp_factor = 0.15;
+        let dx = self.target_x - self.current_x;
+        let dy = self.target_y - self.current_y;
+        let mut movement_dirty = false;
+
+        if dx.abs() > 0.1 || dy.abs() > 0.1 {
+            self.current_x += dx * lerp_factor;
+            self.current_y += dy * lerp_factor;
+            movement_dirty = true;
+        } else {
+            // Snap to target if very close
+            self.current_x = self.target_x;
+            self.current_y = self.target_y;
+        }
+
+        // --- 2. Idle "Floating" Effect ---
+        // Adds a subtle up/down wave when idle to make her feel alive
+        let (float_x, float_y) = if self.current_state == "idle" || self.current_state == "waving" {
+            let t = now.duration_since(Instant::now() - Duration::from_secs(3600)).as_secs_f64();
+            (
+                (t * 0.5).cos() * 2.0, // 2px side-to-side
+                (t * 1.5).sin() * 4.0, // 4px up-and-down
+            )
+        } else {
+            (0.0, 0.0)
+        };
+
+        if movement_dirty || float_x.abs() > 0.1 || float_y.abs() > 0.1 {
+            if let Some(ref ls) = self.layer_surface {
+                ls.set_anchor(Anchor::TOP | Anchor::LEFT);
+                ls.set_margin(
+                    (self.current_y + float_y) as i32,
+                    0,
+                    0,
+                    (self.current_x + float_x) as i32,
+                );
+                // We don't commit here anymore, draw() will do it
+            }
+            movement_dirty = true;
+        }
+
+        // --- 3. State/Animation Logic ---
         // Check state revert timer
         if let Some((ref revert_to, deadline)) = self.revert_state {
             if now >= deadline {
@@ -182,20 +236,11 @@ impl BuddyApp {
         };
 
         self.last_frame = now;
-        let dirty = sprite_dirty || speech_dirty || self.needs_redraw;
+        let dirty = sprite_dirty || speech_dirty || self.needs_redraw || movement_dirty;
         self.needs_redraw = false;
         dirty
     }
 
-    /// Render the current frame into the wl_shm buffer and commit the surface.
-    ///
-    /// This is the core rendering path:
-    /// 1. Tick animation state
-    /// 2. Render sprite + speech bubble to our internal RGBA buffer
-    /// 3. Convert RGBA → pre-multiplied ARGB8888 (Wayland's pixel format)
-    /// 4. Write into the wl_shm pool's buffer
-    /// 5. Attach the buffer to the surface and commit
-    /// 6. If still animating, request another frame callback
     fn draw(&mut self, qh: &QueueHandle<Self>) {
         let layer_surface = match self.layer_surface.as_ref() {
             Some(ls) => ls,
@@ -207,7 +252,6 @@ impl BuddyApp {
         };
 
         if !self.visible {
-            // Attach a null buffer to hide the surface
             layer_surface.wl_surface().attach(None, 0, 0);
             layer_surface.wl_surface().commit();
             return;
@@ -217,8 +261,6 @@ impl BuddyApp {
         let height = self.height;
         let stride = width as i32 * 4;
 
-        // Allocate a buffer from the shared-memory pool.
-        // The compositor will read from this memory directly.
         let (buffer, canvas) = match pool.create_buffer(
             width as i32,
             height as i32,
@@ -232,57 +274,36 @@ impl BuddyApp {
             }
         };
 
-        // Render to our internal RGBA buffer
         self.renderer.clear();
-
         if let Some(pixels) = self.sprites.current_frame() {
             self.renderer.blit_sprite(pixels, width, height);
         }
-
         if let Some(ref bubble) = self.speech {
             let (bpx, bx, by, bw, bh) = bubble.render(width);
             self.renderer.blit_overlay(&bpx, bx, by, bw, bh);
         }
 
-        // Convert RGBA → pre-multiplied ARGB8888 and write to wl_shm canvas.
-        //
-        // Wayland's ARGB8888 format stores pixels as 0xAARRGGBB in native
-        // byte order. On little-endian (x86), memory layout is [B, G, R, A].
-        // Colors must be pre-multiplied by alpha.
         let rgba = self.renderer.pixels();
-        let pixel_count = (width * height) as usize;
-        for i in 0..pixel_count {
+        for i in 0..(width * height) as usize {
             let src = i * 4;
             let dst = i * 4;
-            if src + 3 >= rgba.len() || dst + 3 >= canvas.len() {
-                break;
-            }
-            let r = rgba[src] as u32;
-            let g = rgba[src + 1] as u32;
-            let b = rgba[src + 2] as u32;
             let a = rgba[src + 3] as u32;
-
-            // Pre-multiply
-            let r_pm = (r * a / 255) as u8;
-            let g_pm = (g * a / 255) as u8;
-            let b_pm = (b * a / 255) as u8;
-
-            // Little-endian ARGB8888: [B, G, R, A]
-            canvas[dst] = b_pm;
-            canvas[dst + 1] = g_pm;
-            canvas[dst + 2] = r_pm;
-            canvas[dst + 3] = a as u8;
+            canvas[dst] = (rgba[src + 2] as u32 * a / 255) as u8;     // B
+            canvas[dst + 1] = (rgba[src + 1] as u32 * a / 255) as u8; // G
+            canvas[dst + 2] = (rgba[src] as u32 * a / 255) as u8;     // R
+            canvas[dst + 3] = a as u8;                               // A
         }
 
-        // Attach the buffer to the surface and mark the entire area as damaged.
         let surface = layer_surface.wl_surface();
         surface.attach(Some(buffer.wl_buffer()), 0, 0);
         surface.damage_buffer(0, 0, width as i32, height as i32);
 
-        // Request a frame callback if we're still animating.
-        // The compositor will call CompositorHandler::frame() when it's ready
-        // for the next frame, giving us proper VSync and preventing overdraw.
-        if self.speech.is_some() || self.sprites.is_transitioning() {
+        // ALWAYS request a frame callback if we are animating or moving.
+        // This ensures tick() is called at the display's refresh rate.
+        let is_moving = (self.target_x - self.current_x).abs() > 0.1 || (self.target_y - self.current_y).abs() > 0.1;
+        let is_floating = self.current_state == "idle" || self.current_state == "waving";
+        
+        if self.speech.is_some() || self.sprites.is_transitioning() || is_moving || is_floating {
             surface.frame(qh, surface.clone());
         }
 
@@ -313,6 +334,24 @@ impl CompositorHandler for BuddyApp {
         _qh: &QueueHandle<Self>,
         _surface: &wl_surface::WlSurface,
         _new_transform: wl_output::Transform,
+    ) {
+    }
+
+    fn surface_enter(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _output: &wl_output::WlOutput,
+    ) {
+    }
+
+    fn surface_leave(
+        &mut self,
+        _conn: &Connection,
+        _qh: &QueueHandle<Self>,
+        _surface: &wl_surface::WlSurface,
+        _output: &wl_output::WlOutput,
     ) {
     }
 
@@ -382,7 +421,7 @@ impl LayerShellHandler for BuddyApp {
         &mut self,
         _conn: &Connection,
         qh: &QueueHandle<Self>,
-        _layer: &LayerSurface,
+        layer: &LayerSurface,
         configure: LayerSurfaceConfigure,
         _serial: u32,
     ) {
@@ -399,10 +438,28 @@ impl LayerShellHandler for BuddyApp {
         // Recreate renderer if size changed
         self.renderer = ShmRenderer::new(self.width, self.height);
 
+        // set_margin(top, right, bottom, left)
+        let (margin_top, margin_right, margin_bottom, margin_left) =
+            match self.config.window.anchor.as_str() {
+                "bottom-right" => (0, self.config.window.margin_x, self.config.window.margin_y, 0),
+                "bottom-left" => (0, 0, self.config.window.margin_y, self.config.window.margin_x),
+                "top-right" => (self.config.window.margin_y, self.config.window.margin_x, 0, 0),
+                "top-left" => (self.config.window.margin_y, 0, 0, self.config.window.margin_x),
+                _ => (0, self.config.window.margin_x, self.config.window.margin_y, 0),
+            };
+
         if !self.configured {
             self.configured = true;
+            self.current_x = margin_left as f64;
+            self.current_y = margin_top as f64;
+            self.target_x = self.current_x;
+            self.target_y = self.current_y;
             // Draw the first frame immediately
             self.draw(qh);
+        }
+ else {
+            // A commit is required after configure even if we don't redraw
+            layer.wl_surface().commit();
         }
     }
 }
@@ -513,7 +570,7 @@ fn main() {
         }
     };
 
-    let (globals, event_queue) = match registry_queue_handle(&conn) {
+    let (globals, event_queue) = match registry_queue_init(&conn) {
         Ok(pair) => pair,
         Err(e) => {
             error!("Failed to get Wayland registry: {}", e);
@@ -629,6 +686,10 @@ fn main() {
         current_state: "idle".to_string(),
         revert_state: None,
         visible: true,
+        current_x: 0.0,
+        current_y: 0.0,
+        target_x: 0.0,
+        target_y: 0.0,
         needs_redraw: true,
         exit: false,
         last_frame: Instant::now(),
@@ -657,7 +718,8 @@ fn main() {
         .expect("Failed to insert IPC channel source");
 
     // Animation timer — fires periodically to advance animation and redraw.
-    let timer = Timer::immediate();
+    let timer = Timer::from_duration(Duration::from_millis(100));
+    let qh_for_timer = qh.clone();
     loop_handle
         .insert_source(timer, move |_, _, state: &mut BuddyApp| {
             let dirty = state.tick();
@@ -674,8 +736,9 @@ fn main() {
                 Duration::from_secs_f64(1.0 / fps as f64)
             };
 
-            if dirty && state.configured {
-                state.needs_redraw = true;
+            if (dirty || state.needs_redraw) && state.configured {
+                state.draw(&qh_for_timer);
+                state.needs_redraw = false;
             }
 
             TimeoutAction::ToDuration(interval)
@@ -686,30 +749,19 @@ fn main() {
     info!("Entering main event loop");
 
     while !app.exit {
+        // Dispatch all pending events with a short timeout.
+        if let Err(e) = event_loop.dispatch(Duration::from_millis(16), &mut app) {
+            error!("Event loop error: {}", e);
+            break;
+        }
+
         // Poll IPC for commands and forward them into the calloop event loop
-        // via the channel. This ensures they're processed with proper access
-        // to all event loop state.
         match ipc.poll() {
             Ok(Some(cmd)) => {
                 let _ = ipc_tx.send(cmd);
             }
             Ok(None) => {}
             Err(e) => warn!("IPC error: {}", e),
-        }
-
-        // If we need to redraw, do it now. We have access to the QueueHandle
-        // through the event queue we created earlier.
-        if app.needs_redraw && app.configured {
-            app.draw(&qh);
-            app.needs_redraw = false;
-        }
-
-        // Dispatch all pending events with a short timeout.
-        // This processes Wayland events (configure, frame callbacks),
-        // timer events (animation ticks), and IPC channel messages.
-        if let Err(e) = event_loop.dispatch(Duration::from_millis(16), &mut app) {
-            error!("Event loop error: {}", e);
-            break;
         }
     }
 
