@@ -14,7 +14,7 @@ from pathlib import Path
 
 import aiosqlite
 
-logger = logging.getLogger("virtual-buddy.brain.persistence")
+logger = logging.getLogger("hypr-buddy.brain.persistence")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS mood_history (

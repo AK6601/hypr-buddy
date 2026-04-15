@@ -18,7 +18,7 @@ import time
 from ipc.protocol import DesktopEvent, EventType
 from daemon.sender import EventSender
 
-logger = logging.getLogger("virtual-buddy.daemon.notifications")
+logger = logging.getLogger("hypr-buddy.daemon.notifications")
 
 
 class NotificationMonitor:

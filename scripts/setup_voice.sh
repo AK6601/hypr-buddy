@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Virtual Buddy — Voice Model Setup
+# Hypr Buddy — Voice Model Setup
 # ====================================
 # Downloads a Piper TTS voice model for speech synthesis.
 #
@@ -53,4 +53,4 @@ fi
 
 info "Voice model installed at $MODEL_PATH"
 info ""
-info "To test: echo 'Hello, I am your virtual buddy!' | piper --model $MODEL_PATH --output_raw | aplay -r 22050 -f S16_LE -c 1"
+info "To test: echo 'Hello, I am your hypr buddy!' | piper --model $MODEL_PATH --output_raw | aplay -r 22050 -f S16_LE -c 1"

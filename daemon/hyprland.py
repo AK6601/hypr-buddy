@@ -22,7 +22,7 @@ from pathlib import Path
 from ipc.protocol import DesktopEvent, EventType
 from daemon.sender import EventSender
 
-logger = logging.getLogger("virtual-buddy.daemon.hyprland")
+logger = logging.getLogger("hypr-buddy.daemon.hyprland")
 
 
 def _get_socket2_path() -> Path | None:

@@ -32,7 +32,7 @@ from brain.overlay_client import OverlayClient
 from brain.persistence import Database
 from brain.tts import TTSEngine
 
-logger = logging.getLogger("virtual-buddy.brain.chat")
+logger = logging.getLogger("hypr-buddy.brain.chat")
 
 
 def _chat_socket_path() -> str:
@@ -43,9 +43,9 @@ def _chat_socket_path() -> str:
     ]
     for base in candidates:
         if base and os.path.isdir(base):
-            return os.path.join(base, "virtual-buddy", "chat.sock")
+            return os.path.join(base, "hypr-buddy", "chat.sock")
     import tempfile
-    return os.path.join(tempfile.gettempdir(), f"virtual-buddy-{os.getuid()}", "chat.sock")
+    return os.path.join(tempfile.gettempdir(), f"hypr-buddy-{os.getuid()}", "chat.sock")
 
 
 CHAT_SOCKET = _chat_socket_path()

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Virtual Buddy — Launch Script
+# Hypr Buddy — Launch Script
 # ===============================
 # Starts all three components (daemon, brain, overlay) as background processes.
 # Stores PIDs for clean shutdown via stop.sh.
@@ -8,7 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/virtual-buddy"
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr-buddy"
 mkdir -p "$RUNTIME_DIR" && chmod 700 "$RUNTIME_DIR"
 PID_FILE="$RUNTIME_DIR/pids"
 
@@ -23,7 +23,7 @@ error() { echo -e "${RED}[ERROR]${NC} $*"; exit 1; }
 
 # Check if already running
 if [ -f "$PID_FILE" ]; then
-    warn "PID file exists. Virtual Buddy may already be running."
+    warn "PID file exists. Hypr Buddy may already be running."
     warn "Run './scripts/stop.sh' first, or delete $PID_FILE"
     exit 1
 fi
@@ -57,7 +57,7 @@ info "Daemon PID: $DAEMON_PID"
 # -----------------------------------------------------------------------
 # Start the Overlay
 # -----------------------------------------------------------------------
-OVERLAY_BIN="$PROJECT_DIR/overlay/target/release/virtual-buddy-overlay"
+OVERLAY_BIN="$PROJECT_DIR/overlay/target/release/hypr-buddy-overlay"
 if [ ! -f "$OVERLAY_BIN" ]; then
     warn "Overlay binary not found. Building..."
     cd "$PROJECT_DIR/overlay" && cargo build --release
@@ -65,7 +65,7 @@ if [ ! -f "$OVERLAY_BIN" ]; then
 fi
 
 info "Starting overlay..."
-VIRTUAL_BUDDY_ASSETS="$PROJECT_DIR/assets/sprites" "$OVERLAY_BIN" &
+HYPR_BUDDY_ASSETS="$PROJECT_DIR/assets/sprites" "$OVERLAY_BIN" &
 OVERLAY_PID=$!
 info "Overlay PID: $OVERLAY_PID"
 
@@ -90,7 +90,7 @@ info "To stop: ./scripts/stop.sh"
 # Trap for clean shutdown when this script is killed
 # -----------------------------------------------------------------------
 cleanup() {
-    info "Shutting down Virtual Buddy..."
+    info "Shutting down Hypr Buddy..."
     kill "$BRAIN_PID" "$DAEMON_PID" "$OVERLAY_PID" 2>/dev/null || true
     rm -f "$PID_FILE"
     info "Stopped."

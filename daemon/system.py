@@ -19,7 +19,7 @@ from pathlib import Path
 from ipc.protocol import DesktopEvent, EventType
 from daemon.sender import EventSender
 
-logger = logging.getLogger("virtual-buddy.daemon.system")
+logger = logging.getLogger("hypr-buddy.daemon.system")
 
 
 def _read_battery() -> dict | None:

@@ -1,5 +1,5 @@
 """
-Virtual Buddy Daemon
+Hypr Buddy Daemon
 ====================
 
 Async service that monitors the CachyOS/Hyprland desktop and forwards
@@ -35,7 +35,7 @@ from daemon.notifications import NotificationMonitor
 from daemon.system import SystemMonitor
 from daemon.sender import EventSender
 
-logger = logging.getLogger("virtual-buddy.daemon")
+logger = logging.getLogger("hypr-buddy.daemon")
 
 
 def load_config() -> dict:
@@ -53,7 +53,7 @@ async def main() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
-    logger.info("Virtual Buddy Daemon starting...")
+    logger.info("Hypr Buddy Daemon starting...")
 
     config = load_config()
     sender = EventSender(BRAIN_SOCKET)

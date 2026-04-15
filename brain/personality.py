@@ -65,7 +65,7 @@ class Personality:
     ) -> str:
         """Build a system prompt for the LLM including personality and context."""
         lines = [
-            f"You are {self.name}, a virtual desktop companion.",
+            f"You are {self.name}, a hypr desktop companion.",
             f"Personality: {self.description}",
             f"Current mood: {mood_label}",
         ]

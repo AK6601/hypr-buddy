@@ -13,7 +13,7 @@ import logging
 import shutil
 from pathlib import Path
 
-logger = logging.getLogger("virtual-buddy.brain.tts")
+logger = logging.getLogger("hypr-buddy.brain.tts")
 
 
 class TTSEngine:

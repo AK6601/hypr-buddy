@@ -16,7 +16,7 @@ import httpx
 
 from brain.personality import Personality
 
-logger = logging.getLogger("virtual-buddy.brain.llm")
+logger = logging.getLogger("hypr-buddy.brain.llm")
 
 
 class LLMBackend:

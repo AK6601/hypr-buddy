@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Virtual Buddy — Installation Script
+# Hypr Buddy — Installation Script
 # =====================================
 # Installs all dependencies on CachyOS / Arch Linux.
 # Run this once after cloning the repository.
@@ -80,8 +80,8 @@ pip install --user --break-system-packages \
 # 4. Create data directories
 # -----------------------------------------------------------------------
 info "Creating data directories..."
-DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/virtual-buddy"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/virtual-buddy"
+DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/hypr-buddy"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr-buddy"
 
 mkdir -p "$DATA_DIR"
 mkdir -p "$CONFIG_DIR"
@@ -92,7 +92,7 @@ mkdir -p "$CONFIG_DIR"
 info "Building the overlay (Rust)..."
 cd "$PROJECT_DIR/overlay"
 cargo build --release
-info "Overlay binary: $PROJECT_DIR/overlay/target/release/virtual-buddy-overlay"
+info "Overlay binary: $PROJECT_DIR/overlay/target/release/hypr-buddy-overlay"
 
 # -----------------------------------------------------------------------
 # 6. Generate placeholder sprites
@@ -113,7 +113,7 @@ bash "$SCRIPT_DIR/setup_voice.sh"
 echo ""
 info "Installation complete!"
 info ""
-info "To start Virtual Buddy:"
+info "To start Hypr Buddy:"
 info "  cd $PROJECT_DIR"
 info "  ./scripts/run.sh"
 info ""

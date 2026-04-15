@@ -1,4 +1,4 @@
-# Virtual Buddy
+# Hypr Buddy
 
 A desktop companion/mascot application for **CachyOS** with **Hyprland** (Wayland). A persistent animated character floats on top of all windows, reacts to desktop events, notifications, and active windows, speaks via TTS, and can hold conversations via LLM integration.
 
@@ -57,8 +57,8 @@ A desktop companion/mascot application for **CachyOS** with **Hyprland** (Waylan
 ### Quick Install
 
 ```bash
-git clone https://github.com/yourusername/virtual-buddy.git
-cd virtual-buddy
+git clone https://github.com/yourusername/hypr-buddy.git
+cd hypr-buddy
 ./scripts/install.sh
 ```
 
@@ -117,7 +117,7 @@ Chat with the buddy using the built-in prompt. The brain uses your configured LL
 Add to `~/.config/hypr/hyprland.conf`:
 
 ```
-bind = $mainMod, B, exec, ~/virtual-buddy/scripts/chat.sh
+bind = $mainMod, B, exec, ~/hypr-buddy/scripts/chat.sh
 ```
 
 Press `Super+B` to open a fuzzel/wofi prompt, type your message, and the buddy responds via speech bubble + TTS.
@@ -126,7 +126,7 @@ Press `Super+B` to open a fuzzel/wofi prompt, type your message, and the buddy r
 
 ```bash
 # Via socat
-echo "How are you today?" | socat -t5 - UNIX-CONNECT:$XDG_RUNTIME_DIR/virtual-buddy/chat.sock
+echo "How are you today?" | socat -t5 - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr-buddy/chat.sock
 
 # Via the chat script
 ./scripts/chat.sh
@@ -139,7 +139,7 @@ Supports: **fuzzel** (default on Hyprland), wofi, rofi, bemenu, zenity.
 You can also control the overlay directly for testing:
 
 ```bash
-SOCK="$XDG_RUNTIME_DIR/virtual-buddy/overlay.sock"
+SOCK="$XDG_RUNTIME_DIR/hypr-buddy/overlay.sock"
 
 # Make her say something
 echo '{"cmd": "say", "text": "Hello world!", "state": "talking"}' | socat - UNIX-CONNECT:$SOCK
@@ -177,7 +177,7 @@ ollama_url = "http://localhost:11434"
 
 **Ollama (Local, Default):** Install [Ollama](https://ollama.ai), pull a model (`ollama pull mistral`), and it works out of the box.
 
-**Anthropic API:** Set `backend = "anthropic"`, choose a model like `claude-sonnet-4-5-20250514`, and put your API key in `~/.config/virtual-buddy/anthropic_key`.
+**Anthropic API:** Set `backend = "anthropic"`, choose a model like `claude-sonnet-4-5-20250514`, and put your API key in `~/.config/hypr-buddy/anthropic_key`.
 
 ### Event Monitoring (`config/events.toml`)
 
@@ -244,7 +244,7 @@ Edit `brain/proactive.py` and add to the `PROACTIVE_LINES` dictionary.
 ## Project Structure
 
 ```
-virtual-buddy/
+hypr-buddy/
 ├── overlay/              # Rust — Wayland layer-shell overlay renderer
 │   ├── Cargo.toml
 │   └── src/
@@ -301,15 +301,15 @@ virtual-buddy/
 ### "Cannot connect to brain/overlay"
 
 - Components start in order: brain first, then daemon, then overlay
-- Check if sockets exist: `ls -la $XDG_RUNTIME_DIR/virtual-buddy/`
+- Check if sockets exist: `ls -la $XDG_RUNTIME_DIR/hypr-buddy/`
 - Check logs: each component logs to stderr
-- Remove stale sockets: `rm $XDG_RUNTIME_DIR/virtual-buddy/*.sock`
+- Remove stale sockets: `rm $XDG_RUNTIME_DIR/hypr-buddy/*.sock`
 
 ### Overlay doesn't appear
 
 - Ensure your compositor supports `wlr-layer-shell-unstable-v1`
 - Check Hyprland version: `hyprctl version`
-- Try running the overlay manually: `RUST_LOG=debug ./overlay/target/release/virtual-buddy-overlay`
+- Try running the overlay manually: `RUST_LOG=debug ./overlay/target/release/hypr-buddy-overlay`
 
 ### Piper TTS not working
 

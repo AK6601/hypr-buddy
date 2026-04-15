@@ -1,10 +1,10 @@
 """
-IPC Protocol Definitions for Virtual Buddy
+IPC Protocol Definitions for Hypr Buddy
 ==========================================
 
 Defines all message types exchanged between the three components:
-  - Daemon  -> Brain  : DesktopEvent messages (via $XDG_RUNTIME_DIR/virtual-buddy/brain.sock)
-  - Brain   -> Overlay : OverlayCommand messages (via $XDG_RUNTIME_DIR/virtual-buddy/overlay.sock)
+  - Daemon  -> Brain  : DesktopEvent messages (via $XDG_RUNTIME_DIR/hypr-buddy/brain.sock)
+  - Brain   -> Overlay : OverlayCommand messages (via $XDG_RUNTIME_DIR/hypr-buddy/overlay.sock)
 
 All messages are serialized as single-line JSON terminated by a newline character.
 """
@@ -186,12 +186,12 @@ def _runtime_dir() -> str:
     ]
     for base in candidates:
         if base and _os.path.isdir(base):
-            buddy_dir = _os.path.join(base, "virtual-buddy")
+            buddy_dir = _os.path.join(base, "hypr-buddy")
             _os.makedirs(buddy_dir, mode=0o700, exist_ok=True)
             return buddy_dir
     # Final fallback: temp dir with restricted permissions
     import tempfile
-    buddy_dir = _os.path.join(tempfile.gettempdir(), f"virtual-buddy-{_os.getuid()}")
+    buddy_dir = _os.path.join(tempfile.gettempdir(), f"hypr-buddy-{_os.getuid()}")
     _os.makedirs(buddy_dir, mode=0o700, exist_ok=True)
     return buddy_dir
 

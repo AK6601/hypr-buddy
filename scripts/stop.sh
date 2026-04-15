@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Virtual Buddy — Stop Script
+# Hypr Buddy — Stop Script
 # =============================
 # Reads PIDs from the pid file and gracefully shuts down all components.
 
 set -euo pipefail
 
-RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/virtual-buddy"
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr-buddy"
 PID_FILE="$RUNTIME_DIR/pids"
 
 GREEN='\033[0;32m'
@@ -17,13 +17,13 @@ warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 
 if [ ! -f "$PID_FILE" ]; then
     warn "No PID file found at $PID_FILE"
-    warn "Virtual Buddy may not be running."
+    warn "Hypr Buddy may not be running."
 
     # Try to kill by name as a fallback
     info "Attempting to kill by process name..."
     pkill -f "python3 -m brain" 2>/dev/null && info "Killed brain" || true
     pkill -f "python3 -m daemon" 2>/dev/null && info "Killed daemon" || true
-    pkill -f "virtual-buddy-overlay" 2>/dev/null && info "Killed overlay" || true
+    pkill -f "hypr-buddy-overlay" 2>/dev/null && info "Killed overlay" || true
     exit 0
 fi
 
@@ -70,4 +70,4 @@ rm -f "$PID_FILE"
 rm -f "$RUNTIME_DIR/brain.sock"
 rm -f "$RUNTIME_DIR/overlay.sock"
 
-info "Virtual Buddy stopped."
+info "Hypr Buddy stopped."

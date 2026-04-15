@@ -13,7 +13,7 @@ import logging
 import random
 import time
 
-logger = logging.getLogger("virtual-buddy.brain.reactions")
+logger = logging.getLogger("hypr-buddy.brain.reactions")
 
 
 # ---------------------------------------------------------------------------

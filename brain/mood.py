@@ -12,7 +12,7 @@ import asyncio
 import logging
 import time
 
-logger = logging.getLogger("virtual-buddy.brain.mood")
+logger = logging.getLogger("hypr-buddy.brain.mood")
 
 # How much each event type shifts mood
 MOOD_DELTAS: dict[str, float] = {

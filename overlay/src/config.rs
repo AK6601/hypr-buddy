@@ -112,7 +112,7 @@ impl OverlayConfig {
     /// Search for the config file in standard locations.
     fn find_config_path() -> Option<PathBuf> {
         // 1. Environment variable
-        if let Ok(path) = std::env::var("VIRTUAL_BUDDY_CONFIG") {
+        if let Ok(path) = std::env::var("HYPR_BUDDY_CONFIG") {
             let p = PathBuf::from(path).join("overlay.toml");
             if p.exists() {
                 return Some(p);

@@ -14,7 +14,7 @@ import logging
 
 from ipc.protocol import OverlayCommand, set_state, say, hide, show, quit_overlay
 
-logger = logging.getLogger("virtual-buddy.brain.overlay")
+logger = logging.getLogger("hypr-buddy.brain.overlay")
 
 
 class OverlayClient:

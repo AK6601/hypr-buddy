@@ -1,14 +1,14 @@
 """
-Virtual Buddy Brain
+Hypr Buddy Brain
 ====================
 
 The AI/personality engine. Receives events from the daemon, decides reactions,
 and sends commands to the overlay renderer.
 
 Architecture:
-  - Listens on $XDG_RUNTIME_DIR/virtual-buddy/brain.sock for daemon events
-  - Sends commands to overlay via $XDG_RUNTIME_DIR/virtual-buddy/overlay.sock
-  - Listens on $XDG_RUNTIME_DIR/virtual-buddy/chat.sock for user chat input
+  - Listens on $XDG_RUNTIME_DIR/hypr-buddy/brain.sock for daemon events
+  - Sends commands to overlay via $XDG_RUNTIME_DIR/hypr-buddy/overlay.sock
+  - Listens on $XDG_RUNTIME_DIR/hypr-buddy/chat.sock for user chat input
   - Maintains mood state, conversation history, and personality
   - Rule engine for instant reactions + LLM for conversations
   - Proactive behavior on a randomized timer
@@ -42,7 +42,7 @@ from brain.llm import LLMBackend
 from brain.proactive import ProactiveBehavior
 from brain.tts import TTSEngine
 
-logger = logging.getLogger("virtual-buddy.brain")
+logger = logging.getLogger("hypr-buddy.brain")
 
 
 def load_config() -> dict:
@@ -153,7 +153,7 @@ async def main() -> None:
         level=logging.INFO,
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     )
-    logger.info("Virtual Buddy Brain starting...")
+    logger.info("Hypr Buddy Brain starting...")
 
     config = load_config()
     char_cfg = config.get("character", {})
@@ -164,7 +164,7 @@ async def main() -> None:
     # Ensure data directory exists
     data_dir = Path(
         os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")
-    ) / "virtual-buddy"
+    ) / "hypr-buddy"
     data_dir.mkdir(parents=True, exist_ok=True)
 
     # Initialize subsystems

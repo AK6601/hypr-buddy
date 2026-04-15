@@ -1,4 +1,4 @@
-//! Virtual Buddy Overlay
+//! Hypr Buddy Overlay
 //! ======================
 //!
 //! A Wayland layer-shell overlay that renders an animated sprite character
@@ -477,7 +477,7 @@ impl ProvidesRegistryState for BuddyApp {
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
-    info!("Virtual Buddy Overlay starting...");
+    info!("Hypr Buddy Overlay starting...");
 
     let config = OverlayConfig::load();
     info!(
@@ -488,7 +488,7 @@ fn main() {
     // --- Start IPC server ---
     let runtime_dir = std::env::var("XDG_RUNTIME_DIR")
         .unwrap_or_else(|_| format!("/run/user/{}", unsafe { libc::getuid() }));
-    let buddy_dir = format!("{}/virtual-buddy", runtime_dir);
+    let buddy_dir = format!("{}/hypr-buddy", runtime_dir);
     let _ = std::fs::create_dir_all(&buddy_dir);
     let ipc_path = format!("{}/overlay.sock", buddy_dir);
 
@@ -556,7 +556,7 @@ fn main() {
     };
 
     let layer_surface =
-        layer_shell.create_layer_surface(&qh, surface, layer, Some("virtual-buddy"), None);
+        layer_shell.create_layer_surface(&qh, surface, layer, Some("hypr-buddy"), None);
 
     // Configure the layer surface:
     // - anchor: which corner of the screen
@@ -588,7 +588,7 @@ fn main() {
     let pool = SlotPool::new(pool_size, &shm).expect("Failed to create wl_shm pool");
 
     // --- Load sprites ---
-    let sprites_dir = std::env::var("VIRTUAL_BUDDY_ASSETS").unwrap_or_else(|_| {
+    let sprites_dir = std::env::var("HYPR_BUDDY_ASSETS").unwrap_or_else(|_| {
         let exe_dir = std::env::current_exe()
             .ok()
             .and_then(|p| p.parent().map(|p| p.to_path_buf()))

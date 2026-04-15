@@ -10,7 +10,7 @@ greeting_night = "It's getting late... should we call it a night?"
 backend = "ollama"  # or "anthropic"
 model = "mistral"
 ollama_url = "http://localhost:11434"
-anthropic_api_key_file = "~/.config/virtual-buddy/anthropic_key"
+anthropic_api_key_file = "~/.config/hypr-buddy/anthropic_key"
 
 [tts]
 enabled = true

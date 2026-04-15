@@ -13,7 +13,7 @@ import logging
 
 from ipc.protocol import DesktopEvent
 
-logger = logging.getLogger("virtual-buddy.daemon.sender")
+logger = logging.getLogger("hypr-buddy.daemon.sender")
 
 
 class EventSender:

@@ -19,7 +19,7 @@ from brain.personality import Personality
 from brain.reactions import ReactionEngine
 from brain.tts import TTSEngine
 
-logger = logging.getLogger("virtual-buddy.brain.proactive")
+logger = logging.getLogger("hypr-buddy.brain.proactive")
 
 # Proactive comments keyed by context
 PROACTIVE_LINES: dict[str, list[str]] = {

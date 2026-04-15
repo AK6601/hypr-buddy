@@ -1,8 +1,8 @@
 [package]
-name = "virtual-buddy-overlay"
+name = "hypr-buddy-overlay"
 version = "0.1.0"
 edition = "2021"
-description = "Wayland layer-shell overlay renderer for Virtual Buddy"
+description = "Wayland layer-shell overlay renderer for Hypr Buddy"
 
 [dependencies]
 # Wayland client bindings — the foundation for all Wayland communication.

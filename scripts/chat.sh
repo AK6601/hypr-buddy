@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Virtual Buddy — Chat Input
+# Hypr Buddy — Chat Input
 # ============================
 # Opens a text prompt and sends the user's message to the buddy's brain.
 # The buddy will respond via the overlay speech bubble and TTS.
 #
 # Hyprland keybinding (add to ~/.config/hypr/hyprland.conf):
-#   bind = $mainMod, B, exec, ~/virtual-buddy/scripts/chat.sh
+#   bind = $mainMod, B, exec, ~/hypr-buddy/scripts/chat.sh
 #
 # Supports: fuzzel (default on Hyprland), wofi, rofi, bemenu, or zenity.
 
 set -euo pipefail
 
-RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/virtual-buddy"
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/hypr-buddy"
 CHAT_SOCKET="$RUNTIME_DIR/chat.sock"
 
 # Check if brain is running
 if [ ! -S "$CHAT_SOCKET" ]; then
-    notify-send "Virtual Buddy" "Buddy is not running! Start with scripts/run.sh" 2>/dev/null || true
+    notify-send "Hypr Buddy" "Buddy is not running! Start with scripts/run.sh" 2>/dev/null || true
     exit 1
 fi
 
@@ -33,7 +33,7 @@ get_input() {
     elif command -v bemenu &>/dev/null; then
         echo "" | bemenu -p "$prompt"
     elif command -v zenity &>/dev/null; then
-        zenity --entry --title="Virtual Buddy" --text="$prompt"
+        zenity --entry --title="Hypr Buddy" --text="$prompt"
     else
         # Last resort: terminal input
         echo "No GUI prompt found. Install fuzzel, wofi, or rofi." >&2
@@ -45,7 +45,7 @@ get_input() {
 
 get_buddy_name() {
     # Try to read name from config
-    local config="${VIRTUAL_BUDDY_CONFIG:-$(dirname "$(dirname "$(readlink -f "$0")")")/config}/buddy.toml"
+    local config="${HYPR_BUDDY_CONFIG:-$(dirname "$(dirname "$(readlink -f "$0")")")/config}/buddy.toml"
     if [ -f "$config" ]; then
         grep '^name' "$config" 2>/dev/null | head -1 | sed 's/.*= *"\(.*\)".*/\1/' || echo "Buddy"
     else
