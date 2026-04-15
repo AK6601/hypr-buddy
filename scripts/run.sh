@@ -28,6 +28,17 @@ if [ -f "$PID_FILE" ]; then
     exit 1
 fi
 
+# Ensure runtime directory exists
+mkdir -p "$RUNTIME_DIR" && chmod 700 "$RUNTIME_DIR"
+PID_FILE="$RUNTIME_DIR/pids"
+LOG_DIR="$RUNTIME_DIR/logs"
+mkdir -p "$LOG_DIR"
+
+# Check for Wayland
+if [ -z "${WAYLAND_DISPLAY:-}" ]; then
+    error "WAYLAND_DISPLAY is not set. Are you in a Wayland session?"
+fi
+
 # Clean up stale sockets
 rm -f "$RUNTIME_DIR/brain.sock"
 rm -f "$RUNTIME_DIR/overlay.sock"
@@ -35,11 +46,14 @@ rm -f "$RUNTIME_DIR/overlay.sock"
 # Ensure we're in the project directory for relative imports
 cd "$PROJECT_DIR"
 
+# Allow buddy name override via env
+export HYPR_BUDDY_NAME="${HYPR_BUDDY_NAME:-}"
+
 # -----------------------------------------------------------------------
-# Start the Brain (must start first — it creates the socket the daemon connects to)
+# Start the Brain
 # -----------------------------------------------------------------------
-info "Starting brain..."
-PYTHONPATH="$PROJECT_DIR" python3 -m brain &
+info "Starting brain (logs: $LOG_DIR/brain.log)..."
+PYTHONPATH="$PROJECT_DIR" python3 -m brain > "$LOG_DIR/brain.log" 2>&1 &
 BRAIN_PID=$!
 info "Brain PID: $BRAIN_PID"
 
@@ -49,8 +63,8 @@ sleep 1
 # -----------------------------------------------------------------------
 # Start the Daemon
 # -----------------------------------------------------------------------
-info "Starting daemon..."
-PYTHONPATH="$PROJECT_DIR" python3 -m daemon &
+info "Starting daemon (logs: $LOG_DIR/daemon.log)..."
+PYTHONPATH="$PROJECT_DIR" python3 -m daemon > "$LOG_DIR/daemon.log" 2>&1 &
 DAEMON_PID=$!
 info "Daemon PID: $DAEMON_PID"
 
@@ -64,10 +78,11 @@ if [ ! -f "$OVERLAY_BIN" ]; then
     cd "$PROJECT_DIR"
 fi
 
-info "Starting overlay..."
-HYPR_BUDDY_ASSETS="$PROJECT_DIR/assets/sprites" "$OVERLAY_BIN" &
+info "Starting overlay (logs: $LOG_DIR/overlay.log)..."
+HYPR_BUDDY_ASSETS="$PROJECT_DIR/assets/sprites" "$OVERLAY_BIN" > "$LOG_DIR/overlay.log" 2>&1 &
 OVERLAY_PID=$!
 info "Overlay PID: $OVERLAY_PID"
+
 
 # -----------------------------------------------------------------------
 # Save PIDs

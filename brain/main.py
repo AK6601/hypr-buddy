@@ -30,7 +30,7 @@ except ModuleNotFoundError:
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from ipc.protocol import BRAIN_SOCKET, OVERLAY_SOCKET
+from ipc.protocol import BRAIN_SOCKET, OVERLAY_SOCKET, EventType
 
 from brain.chat import ChatHandler
 from brain.mood import MoodSystem
@@ -55,6 +55,20 @@ def load_config() -> dict:
         return tomllib.load(f)
 
 
+# Global state for buddy position and current window geometry
+class BuddyPos:
+    def __init__(self):
+        self.x = 0
+        self.y = 0
+        self.w = 256
+        self.h = 256
+        self.window_geo = None
+        self.last_move = 0.0
+        self.current_corner = "top-right"
+
+_pos = BuddyPos()
+
+
 async def handle_event(
     event_data: dict,
     mood: MoodSystem,
@@ -66,8 +80,13 @@ async def handle_event(
     chat: ChatHandler | None = None,
 ) -> None:
     """Process a single event from the daemon."""
+    import random
     event_type = event_data.get("type", "")
     data = event_data.get("data", {})
+
+    # Suppress cursor noise in logs
+    if event_type != "cursor_move":
+        logger.debug("Event: %s -> %s", event_type, data)
 
     # Update chat handler context so LLM has awareness of desktop state
     if chat is not None:
@@ -75,6 +94,64 @@ async def handle_event(
 
     # Update mood based on event
     mood.process_event(event_type, data)
+
+    # Movement Logic: Follow Active Window
+    if event_type in (EventType.WINDOW_FOCUS, EventType.WINDOW_MOVE, EventType.WINDOW_RESIZE) and "geometry" in data:
+        _pos.window_geo = data["geometry"]
+        if _pos.window_geo:
+            wx, wy = _pos.window_geo["x"], _pos.window_geo["y"]
+            ww, wh = _pos.window_geo["w"], _pos.window_geo["h"]
+            
+            # If focus changed, pick a new random corner
+            if event_type == EventType.WINDOW_FOCUS:
+                _pos.current_corner = random.choice(["top-left", "top-right", "bottom-left", "bottom-right"])
+
+            # Calculate coordinates based on chosen corner
+            if _pos.current_corner == "top-left":
+                _pos.x, _pos.y = wx - _pos.w // 2, wy - _pos.h // 2
+            elif _pos.current_corner == "top-right":
+                _pos.x, _pos.y = wx + ww - _pos.w // 2, wy - _pos.h // 2
+            elif _pos.current_corner == "bottom-left":
+                _pos.x, _pos.y = wx - _pos.w // 2, wy + wh - _pos.h // 2
+            elif _pos.current_corner == "bottom-right":
+                _pos.x, _pos.y = wx + ww - _pos.w // 2, wy + wh - _pos.h // 2
+
+            await overlay.move_to(int(_pos.x), int(_pos.y))
+
+    # Movement Logic: Avoid Mouse Proximity
+    elif event_type == "cursor_move":
+        import time
+        mx, my = data.get("x", 0), data.get("y", 0)
+        
+        # Center of buddy
+        bx = _pos.x + _pos.w // 2
+        by = _pos.y + _pos.h // 2
+        
+        dist = ((mx - bx)**2 + (my - by)**2)**0.5
+        now = time.time()
+        
+        # If cursor is within 150px and we haven't hopped in the last 2 seconds
+        if dist < 150 and _pos.window_geo and (now - _pos.last_move > 2.0):
+            # Define possible window corners
+            wx, wy = _pos.window_geo["x"], _pos.window_geo["y"]
+            ww, wh = _pos.window_geo["w"], _pos.window_geo["h"]
+            
+            corners = [
+                (wx - _pos.w // 2, wy - _pos.h // 2),        # Top-Left
+                (wx + ww - _pos.w // 2, wy - _pos.h // 2),   # Top-Right
+                (wx - _pos.w // 2, wy + wh - _pos.h // 2),   # Bottom-Left
+                (wx + ww - _pos.w // 2, wy + wh - _pos.h // 2), # Bottom-Right
+            ]
+            
+            # Filter corners: must be at least 200px from mouse
+            safe_corners = [c for c in corners if ((mx - (c[0] + _pos.w // 2))**2 + (my - (c[1] + _pos.h // 2))**2)**0.5 > 200]
+            
+            if safe_corners:
+                _pos.x, _pos.y = random.choice(safe_corners)
+                _pos.last_move = now
+                await overlay.move_to(int(_pos.x), int(_pos.y))
+                # Optional: visual reaction to being startled
+                await overlay.set_state("surprised", 1.0)
 
     # Check for a reaction
     reaction = reactions.get_reaction(event_type, data, mood.value)
@@ -157,6 +234,13 @@ async def main() -> None:
 
     config = load_config()
     char_cfg = config.get("character", {})
+    
+    # Allow environment override for name
+    env_name = os.environ.get("HYPR_BUDDY_NAME")
+    if env_name:
+        char_cfg["name"] = env_name
+        logger.info("Buddy name overridden by environment: %s", env_name)
+
     behavior_cfg = config.get("behavior", {})
     tts_cfg = config.get("tts", {})
     llm_cfg = config.get("llm", {})
@@ -211,6 +295,9 @@ async def main() -> None:
     tasks.append(asyncio.create_task(proactive.run(), name="proactive"))
 
     # Startup greeting
+    logger.info("Waiting for overlay to be ready...")
+    await overlay.wait_ready(timeout=15.0)
+    
     greeting = personality.get_greeting()
     await overlay.say(greeting, "waving")
     await tts.speak(greeting)
