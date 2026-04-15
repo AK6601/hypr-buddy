@@ -26,12 +26,15 @@ class EventType(str, Enum):
     WINDOW_FOCUS = "window_focus"
     WINDOW_OPEN = "window_open"
     WINDOW_CLOSE = "window_close"
+    WINDOW_MOVE = "window_move"
+    WINDOW_RESIZE = "window_resize"
     NOTIFICATION = "notification"
     WORKSPACE = "workspace"
     FULLSCREEN = "fullscreen"
     BATTERY = "battery"
     TIME = "time"
     MONITOR = "monitor"
+    CURSOR_MOVE = "cursor_move"
 
 
 @dataclass
@@ -82,6 +85,7 @@ class CommandType(str, Enum):
 VALID_STATES = frozenset({
     "idle", "talking", "happy", "sad", "surprised",
     "thinking", "sleeping", "waving", "angry",
+    "laughing", "blushing",
 })
 
 
