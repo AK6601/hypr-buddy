@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "hypr-buddy"
@@ -26,6 +26,11 @@ dev = [
     "mypy>=1.5.0",
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
+]
+voice = [
+    "openai-whisper>=20231117",
+    "torch>=2.0.0",
+    "numpy>=1.24.0",
 ]
 
 [tool.setuptools.packages.find]

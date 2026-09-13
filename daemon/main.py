@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ipc.protocol import BRAIN_SOCKET
 
 from daemon.hyprland import HyprlandMonitor
+from daemon.geometry import GeometryMonitor
 from daemon.notifications import NotificationMonitor
 from daemon.system import SystemMonitor
 from daemon.sender import EventSender
@@ -66,6 +67,13 @@ async def main() -> None:
     ignore_cfg = config.get("ignore", {})
     hypr = HyprlandMonitor(sender, hypr_cfg, ignore_cfg)
     tasks.append(asyncio.create_task(hypr.run(), name="hyprland"))
+
+    # Geometry & cursor poller — gives continuous window-following + cursor
+    # awareness that the discrete socket2 event stream can't provide.
+    follow_cfg = config.get("follow", {})
+    if follow_cfg.get("enabled", True):
+        geom = GeometryMonitor(sender, follow_cfg)
+        tasks.append(asyncio.create_task(geom.run(), name="geometry"))
 
     # D-Bus notification monitor
     notif_cfg = config.get("notifications", {})

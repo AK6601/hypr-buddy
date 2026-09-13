@@ -24,31 +24,31 @@ logger = logging.getLogger("hypr-buddy.brain.proactive")
 # Proactive comments keyed by context
 PROACTIVE_LINES: dict[str, list[str]] = {
     "long_work": [
-        "You've been at it for a while! Maybe stretch a bit?",
-        "Don't forget to drink some water~",
-        "A short break can do wonders for productivity!",
-        "Your dedication is impressive, but rest is important too!",
+        "Hey, you've been locked in for a while~ stretch break? I'll wait.",
+        "Hydration check! 💧 grab some water, I'll guard your code.",
+        "You've been grinding hard. Quick breather? Your brain'll thank you.",
+        "Still going strong! Maybe blink a few times for me? 😄",
     ],
     "idle_check": [
-        "Whatcha thinking about?",
-        "Everything okay over there?",
-        "Need any help with anything?",
-        "Just checking in~",
+        "Whatcha thinking about? 👀",
+        "I'm here if you need me~ just say the word.",
+        "Standing by! Poke me anytime.",
+        "All quiet~ want me to do anything?",
     ],
     "encouragement": [
-        "You're doing great!",
-        "Keep it up! I believe in you~",
-        "Whatever you're working on, I'm sure it'll turn out awesome!",
+        "Ooh nice, you're on a roll! Keep going~",
+        "Look at you being all productive. So cool. ✨",
+        "This is coming together really nicely — proud of you!",
     ],
     "late_night": [
-        "It's really late... please consider going to sleep!",
-        "The code will still be there tomorrow, I promise.",
-        "Burning the midnight oil? At least grab a snack.",
+        "It's late late~ wanna call it and pick it up tomorrow? Your code'll still be here, promise.",
+        "Burning the midnight oil, huh. I'll stay up with you. 🌙",
+        "Psst, future-you would really love a good night's sleep~",
     ],
     "morning_energy": [
-        "The day is young! So many possibilities~",
-        "Fresh start, fresh code!",
-        "Let's make today productive!",
+        "Morning! I already feel like today's a good one~",
+        "Fresh start! What's first on the list?",
+        "New day, clean slate — let's make something cool. ☀",
     ],
 }
 
@@ -68,11 +68,20 @@ class ProactiveBehavior:
         self._interval_min: int = behavior_config.get("proactive_interval_min", 20)
         self._interval_max: int = behavior_config.get("proactive_interval_max", 40)
         self._during_fullscreen: bool = behavior_config.get("proactive_during_fullscreen", False)
+        self._startup_delay: float = behavior_config.get("proactive_startup_delay", 60)
         self._mood = mood
         self._overlay = overlay
         self._tts = tts
         self._personality = personality
         self._is_fullscreen = False
+
+    def reconfigure(self, behavior_config: dict) -> None:
+        """Re-apply tunable proactive parameters in place."""
+        cfg = behavior_config or {}
+        self._interval_min = cfg.get("proactive_interval_min", self._interval_min)
+        self._interval_max = cfg.get("proactive_interval_max", self._interval_max)
+        self._during_fullscreen = cfg.get("proactive_during_fullscreen", self._during_fullscreen)
+        self._startup_delay = cfg.get("proactive_startup_delay", self._startup_delay)
 
     def set_fullscreen(self, fs: bool) -> None:
         self._is_fullscreen = fs
@@ -80,7 +89,7 @@ class ProactiveBehavior:
     async def run(self) -> None:
         """Main proactive loop — fires on a randomized interval."""
         # Wait a bit after startup before first proactive comment
-        await asyncio.sleep(60)
+        await asyncio.sleep(self._startup_delay)
 
         while True:
             interval = random.randint(self._interval_min, self._interval_max) * 60
@@ -94,6 +103,8 @@ class ProactiveBehavior:
 
     async def _do_proactive(self) -> None:
         """Pick and deliver a contextual proactive comment."""
+        if self._tts.listening or self._tts.conversing:
+            return
         from datetime import datetime
 
         hour = datetime.now().hour

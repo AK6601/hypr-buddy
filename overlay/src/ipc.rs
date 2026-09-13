@@ -15,7 +15,7 @@
 
 use std::io::{self, BufRead, BufReader, ErrorKind};
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
@@ -44,29 +44,21 @@ struct RawCommand {
 impl RawCommand {
     fn into_command(self) -> Option<IpcCommand> {
         match self.cmd.as_str() {
-            "set_state" => {
-                Some(IpcCommand::SetState {
-                    state: self.state.unwrap_or_else(|| "idle".to_string()),
-                    duration: self.duration.unwrap_or(0.0),
-                })
-            }
-            "say" => {
-                Some(IpcCommand::Say {
-                    text: self.text.unwrap_or_default(),
-                    state: self.state.unwrap_or_else(|| "talking".to_string()),
-                })
-            }
-            "move" => {
-                Some(IpcCommand::Move {
-                    x: self.x.unwrap_or(0),
-                    y: self.y.unwrap_or(0),
-                })
-            }
-            "visibility" => {
-                Some(IpcCommand::Visibility {
-                    visible: self.visible.unwrap_or(true),
-                })
-            }
+            "set_state" => Some(IpcCommand::SetState {
+                state: self.state.unwrap_or_else(|| "idle".to_string()),
+                duration: self.duration.unwrap_or(0.0),
+            }),
+            "say" => Some(IpcCommand::Say {
+                text: self.text.unwrap_or_default(),
+                state: self.state.unwrap_or_else(|| "talking".to_string()),
+            }),
+            "move" => Some(IpcCommand::Move {
+                x: self.x.unwrap_or(0),
+                y: self.y.unwrap_or(0),
+            }),
+            "visibility" => Some(IpcCommand::Visibility {
+                visible: self.visible.unwrap_or(true),
+            }),
             "quit" => Some(IpcCommand::Quit),
             _ => {
                 log::warn!("Unknown IPC command: {}", self.cmd);

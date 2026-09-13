@@ -15,6 +15,15 @@ watch_battery = true
 watch_time = true
 low_battery_threshold = 20
 work_session_alert_minutes = 90
+poll_interval_seconds = 30   # seconds between battery/time/stats polls
+
+[follow]
+# Continuous geometry + cursor poller (daemon/geometry.py).
+enabled = true
+poll_interval = 0.2      # seconds between polls
+cursor_poll = true       # emit cursor_move events for mouse-dodging
+cursor_threshold = 20    # min cursor movement (px) before re-emitting
+monitor_refresh = 5.0    # seconds between monitor-layout refreshes
 
 [ignore]
 window_classes = ["polkit", "xdg-desktop-portal"]

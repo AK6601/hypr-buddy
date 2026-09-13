@@ -35,11 +35,22 @@ pub struct WindowConfig {
     pub margin_y: i32,
     #[serde(default = "default_layer")]
     pub layer: String,
+    /// Whether the idle "floating" wobble effect is enabled.
+    ///
+    /// When `true` (the default) the sprite gently bobs while idle/waving.
+    /// This is now a pure render-space offset (the sprite is blitted at a
+    /// slightly different position each frame) so it no longer causes the
+    /// compositor-reconfigure jitter the old `set_margin`-based approach did.
+    #[serde(default = "default_float")]
+    pub float: bool,
 }
 
 /// Animation timing configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct AnimationConfig {
+    /// Use the registered character rig; false selects legacy PNG strips.
+    #[serde(default = "default_float")]
+    pub procedural: bool,
     /// Frames per second for idle/sleeping states.
     #[serde(default = "default_idle_fps")]
     pub idle_fps: u32,
@@ -69,17 +80,42 @@ pub struct SpeechBubbleConfig {
 }
 
 // Default value functions for serde
-fn default_size() -> u32 { 256 }
-fn default_anchor() -> String { "bottom-right".to_string() }
-fn default_margin() -> i32 { 50 }
-fn default_layer() -> String { "overlay".to_string() }
-fn default_idle_fps() -> u32 { 8 }
-fn default_talking_fps() -> u32 { 12 }
-fn default_transition() -> u32 { 200 }
-fn default_max_width() -> u32 { 300 }
-fn default_font_size() -> u32 { 14 }
-fn default_typewriter_speed() -> u32 { 30 }
-fn default_dismiss_delay() -> f64 { 3.0 }
+fn default_size() -> u32 {
+    256
+}
+fn default_anchor() -> String {
+    "bottom-right".to_string()
+}
+fn default_margin() -> i32 {
+    50
+}
+fn default_layer() -> String {
+    "overlay".to_string()
+}
+fn default_float() -> bool {
+    true
+}
+fn default_idle_fps() -> u32 {
+    8
+}
+fn default_talking_fps() -> u32 {
+    12
+}
+fn default_transition() -> u32 {
+    200
+}
+fn default_max_width() -> u32 {
+    300
+}
+fn default_font_size() -> u32 {
+    14
+}
+fn default_typewriter_speed() -> u32 {
+    30
+}
+fn default_dismiss_delay() -> f64 {
+    3.0
+}
 
 impl OverlayConfig {
     /// Load configuration from the standard config path.
@@ -88,17 +124,15 @@ impl OverlayConfig {
 
         if let Some(path) = config_path {
             match std::fs::read_to_string(&path) {
-                Ok(contents) => {
-                    match toml::from_str(&contents) {
-                        Ok(config) => {
-                            log::info!("Loaded config from {}", path.display());
-                            return config;
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to parse config {}: {}", path.display(), e);
-                        }
+                Ok(contents) => match toml::from_str(&contents) {
+                    Ok(config) => {
+                        log::info!("Loaded config from {}", path.display());
+                        return config;
                     }
-                }
+                    Err(e) => {
+                        log::warn!("Failed to parse config {}: {}", path.display(), e);
+                    }
+                },
                 Err(e) => {
                     log::warn!("Failed to read config {}: {}", path.display(), e);
                 }
@@ -121,7 +155,11 @@ impl OverlayConfig {
 
         // 2. Relative to executable (project layout)
         if let Ok(exe) = std::env::current_exe() {
-            if let Some(project_root) = exe.parent().and_then(|p| p.parent()).and_then(|p| p.parent()) {
+            if let Some(project_root) = exe
+                .parent()
+                .and_then(|p| p.parent())
+                .and_then(|p| p.parent())
+            {
                 let p = project_root.join("config").join("overlay.toml");
                 if p.exists() {
                     return Some(p);
@@ -149,8 +187,10 @@ impl Default for OverlayConfig {
                 margin_x: 50,
                 margin_y: 50,
                 layer: "overlay".to_string(),
+                float: true,
             },
             animation: AnimationConfig {
+                procedural: true,
                 idle_fps: 8,
                 talking_fps: 12,
                 transition_ms: 200,

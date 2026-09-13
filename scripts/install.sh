@@ -33,6 +33,9 @@ PACKAGES=(
     gcc
     pkg-config
     base-devel
+    grim
+    slurp
+    socat
 )
 
 # Piper TTS may be in the AUR on CachyOS
@@ -97,9 +100,8 @@ info "Overlay binary: $PROJECT_DIR/overlay/target/release/hypr-buddy-overlay"
 # -----------------------------------------------------------------------
 # 6. Generate placeholder sprites
 # -----------------------------------------------------------------------
-info "Generating placeholder sprites..."
+info "Using bundled Shiro character artwork."
 cd "$PROJECT_DIR"
-python3 scripts/generate_placeholders.py
 
 # -----------------------------------------------------------------------
 # 7. Download Piper voice model
@@ -112,6 +114,10 @@ bash "$SCRIPT_DIR/setup_voice.sh"
 # -----------------------------------------------------------------------
 echo ""
 info "Installation complete!"
+info ""
+info "Optional: to use the Google Gemini cloud backend, save your API key:"
+info "  echo 'YOUR_API_KEY' > $CONFIG_DIR/gemini_key"
+info "  chmod 600 $CONFIG_DIR/gemini_key"
 info ""
 info "To start Hypr Buddy:"
 info "  cd $PROJECT_DIR"

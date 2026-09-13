@@ -2,7 +2,11 @@
 
 A desktop companion/mascot application for **CachyOS** with **Hyprland** (Wayland). A persistent animated character floats on top of all windows, reacts to desktop events, notifications, and active windows, speaks via TTS, and can hold conversations via LLM integration.
 
-![Screenshot Placeholder](assets/screenshot-placeholder.png)
+![Shiro — animated preview rendered by the Rust overlay](assets/previews/shiro.png)
+
+Shiro now uses a registered character illustration with continuous breathing, blinking,
+speech motion, and gentle gestures. Start a voice session with a hotkey, speak naturally,
+and continue after her reply. [Setup, controls, and validation](docs/companion-upgrade.md).
 
 ## Architecture
 
@@ -49,12 +53,16 @@ A desktop companion/mascot application for **CachyOS** with **Hyprland** (Waylan
 - **Hyprland** (Wayland compositor with wlr-layer-shell support)
 - **Python 3.11+**
 - **Rust** (stable toolchain)
-- **Piper TTS** (optional, for voice)
-- **Ollama** (optional, for LLM conversations)
+- **grim** and **slurp** (for screen-vision capability)
+- **socat** (for IPC socket messaging)
+- **Piper TTS** (optional, for speech output/TTS)
+- **Ollama** (optional, for local LLM text/vision models)
 
 ## Installation
 
 ### Quick Install
+
+The easiest way to get everything set up is using the install script:
 
 ```bash
 git clone https://github.com/yourusername/hypr-buddy.git
@@ -63,32 +71,40 @@ cd hypr-buddy
 ```
 
 The install script will:
-1. Install system packages via `pacman`
-2. Set up the Rust toolchain
-3. Install Python dependencies
-4. Build the Rust overlay
-5. Generate placeholder sprites
-6. Download the Piper voice model
+1. Install required system packages (`wayland`, `rustup`, `grim`, `slurp`, `socat`, etc.) via `pacman`.
+2. Set up the Rust toolchain.
+3. Install Python dependencies inside your environment.
+4. Build the Rust overlay binary (`overlay/target/release/hypr-buddy-overlay`).
+5. Use the bundled Shiro artwork.
+6. Download the default Piper voice model.
 
-### Manual Install
+### Manual / Virtual Environment Setup
+
+To keep your system python environment clean, we recommend setting up a virtual environment:
 
 ```bash
-# System packages
-sudo pacman -S wayland wayland-protocols python python-pip rustup gcc pkg-config
+# 1. Install system dependencies
+sudo pacman -S --needed --noconfirm wayland wayland-protocols python python-pip rustup gcc pkg-config grim slurp socat pipewire-audio ffmpeg alsa-utils
 
-# Rust
+# 2. Set up Rust
 rustup default stable
 
-# Python packages
-pip install --user dbus-next structlog httpx tomli pillow cairosvg aiosqlite
+# 3. Create and activate a Python virtual environment
+python3 -m venv venv
+source venv/bin/activate
 
-# Build overlay
+# 4. Install dependencies (standard or with optional voice support)
+# Standard:
+pip install -e .
+# With voice/audio chat support:
+pip install -e ".[voice]"
+
+# 5. Build the Rust overlay
 cd overlay && cargo build --release && cd ..
 
-# Generate sprites
-python3 scripts/generate_placeholders.py
+# 6. Character artwork is already bundled in assets/character/.
 
-# Download voice model (optional)
+# 7. Download voice model (optional)
 ./scripts/setup_voice.sh
 ```
 
@@ -110,29 +126,38 @@ This launches all three components as background processes. The buddy will appea
 
 ### Talk to Your Buddy
 
-Chat with the buddy using the built-in prompt. The brain uses your configured LLM (Ollama or Anthropic) to generate responses.
+You can converse with your buddy via text prompt or voice chat. The brain uses your configured LLM (Ollama, Gemini, or Anthropic) to generate responses.
 
-**Option 1: Hyprland keybinding (recommended)**
+**Voice session (no textbox or terminal)**
 
-Add to `~/.config/hypr/hyprland.conf`:
+Bind the script to a convenient key, adjusting the absolute repository path:
 
+```ini
+bind = $mainMod SHIFT, B, exec, /home/gato/repos/hypr-buddy/scripts/voice_chat.sh
 ```
-bind = $mainMod, B, exec, ~/hypr-buddy/scripts/chat.sh
+
+Press the key, wait for “Listening…”, and speak. A brief pause ends your turn.
+Shiro transcribes locally and replies aloud; listening resumes after playback finishes.
+Press the key again to stop, including during a reply. Twenty seconds without speech
+ends the session. The microphone closes during inference and playback. This is a
+half-duplex session: interruption uses the hotkey, not spoken barge-in or a wake word.
+Use `scripts/voice_chat.sh --once` for one spoken turn.
+
+**Optional text chat**
+
+```ini
+bind = $mainMod, B, exec, /home/gato/repos/hypr-buddy/scripts/chat.sh
 ```
 
-Press `Super+B` to open a fuzzel/wofi prompt, type your message, and the buddy responds via speech bubble + TTS.
+The text script supports fuzzel, wofi, rofi, bemenu, and zenity. `/model <provider> [model]`
+and `/vision <provider> [model]` change providers; `/stop` interrupts the current turn.
 
-**Option 2: Command line**
+Check dependencies and time a short local reply using the same Python environment as
+`run.sh` (an existing `hypr-buddy` Conda environment takes precedence over `venv`):
 
 ```bash
-# Via socat
-echo "How are you today?" | socat -t5 - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr-buddy/chat.sock
-
-# Via the chat script
-./scripts/chat.sh
+python scripts/doctor.py --benchmark
 ```
-
-Supports: **fuzzel** (default on Hyprland), wofi, rofi, bemenu, zenity.
 
 ### Send Overlay Commands Manually
 
@@ -168,16 +193,45 @@ Customize the name, personality description, and time-based greetings. The perso
 
 ### LLM Integration (`config/buddy.toml`)
 
+Configure the LLM backend for your buddy. You can choose between local Ollama, Google Gemini, or Anthropic Claude.
+
 ```toml
 [llm]
-backend = "ollama"          # "ollama" or "anthropic"
-model = "mistral"           # Model name
+provider = "ollama"                 # "ollama", "gemini", or "anthropic"
+model = "gemma4:e2b"                # Text generation model name
 ollama_url = "http://localhost:11434"
+max_tokens = 512                    # Token cap for cloud backends
 ```
 
-**Ollama (Local, Default):** Install [Ollama](https://ollama.ai), pull a model (`ollama pull mistral`), and it works out of the box.
+- **Ollama (Local, Default):** Install [Ollama](https://ollama.ai), run the service, pull a text model (e.g., `ollama pull gemma4:e2b`), and configure it.
+- **Google Gemini (Cloud):** Set `provider = "gemini"`, choose a model like `gemini-1.5-flash`, and save your API key in `~/.config/hypr-buddy/gemini_key`.
+- **Anthropic Claude (Cloud):** Set `provider = "anthropic"`, choose a model like `claude-3-5-sonnet-20241022`, and save your API key in `~/.config/hypr-buddy/anthropic_key`.
 
-**Anthropic API:** Set `backend = "anthropic"`, choose a model like `claude-sonnet-4-5-20250514`, and put your API key in `~/.config/hypr-buddy/anthropic_key`.
+### Screen Vision / Desktop Awareness (`config/buddy.toml`)
+
+Your buddy can use screen capture tools (`grim`/`slurp`) to view what is currently on your screen (e.g., if you ask "look at my screen").
+
+```toml
+[vision]
+enabled = true                      # Allows the buddy to look at your screen on demand
+provider = "ollama"                 # "ollama", "gemini", or "anthropic"
+model = "gemma4:e2b"                # Reuse the installed vision-capable text model
+
+[vision.ambient]
+enabled = false                     # Set to true to let the buddy look in the background
+interval_sec = 300                  # Seconds between passive glances
+only_active_monitor = true          # Capture only the currently focused monitor
+```
+
+### Window Following & Avoidance (`config/buddy.toml`)
+
+Your buddy can automatically follow the active window and dodge the mouse cursor to stay out of your way.
+
+```toml
+follow_window = true                # If true, buddy follows active windows
+follow_mode = "nearest_free"        # "nearest_free", "fixed", "random"
+cursor_avoid_distance = 150         # Dodges cursor if it comes closer than 150px
+```
 
 ### Event Monitoring (`config/events.toml`)
 
@@ -205,22 +259,34 @@ margin_x = 50               # Distance from screen edge
 margin_y = 50
 
 [animation]
-idle_fps = 8                # Low FPS when idle (saves CPU)
-talking_fps = 12            # Higher FPS when active
-transition_ms = 200         # Crossfade duration between states
+procedural = true          # Shiro rig, animated at 30 Hz
+idle_fps = 8                # Legacy strip playback speed
+talking_fps = 12            # Legacy talking strip playback speed
+transition_ms = 180         # Crossfade duration between states
 ```
 
 ## Customization
 
 ### Custom Sprites
 
-Replace the sprite sheets in `assets/sprites/`. Each state needs a horizontal strip PNG:
+The default artwork lives in `assets/character/`. A single registered pose avoids
+anatomy and silhouette jumps between frames. Only the eye patch changes for blinking;
+breathing, gentle gestures, and mouth motion are rendered continuously. This is a
+lightweight 2D rig, not a full skeletal or Live2D model. Face coordinates are registered
+to this artwork in `overlay/src/sprite.rs`.
 
-- **Format:** 4 frames side-by-side (1024x256 for 256x256 sprites)
-- **Required states:** idle, talking, happy, sad, surprised, thinking, sleeping, waving, angry
-- **Transparency:** Use alpha channel for transparent background
+The original strips remain in `assets/sprites/`. Set `animation.procedural = false` to
+use them. Legacy PNG strips can contain any number of square frames and are resized
+to the configured display dimensions. Missing emotional states fall back to idle.
 
-To regenerate placeholders: `python3 scripts/generate_placeholders.py`
+Generate a reproducible animated PNG using the actual renderer, without Wayland:
+
+```bash
+cargo build --release --manifest-path overlay/Cargo.toml
+overlay/target/release/hypr-buddy-overlay --preview assets/previews/shiro.png
+```
+
+Artwork provenance and prompts: [assets/character/GENERATION.md](assets/character/GENERATION.md).
 
 ### Custom Reactions
 

@@ -1,18 +1,25 @@
 [window]
-width = 256
-height = 256
+width = 224
+height = 224
+# anchor/margin_x/margin_y describe the INITIAL resting position of the sprite
+# (where it sits before the brain sends its first "move" command). After the
+# first move, the sprite's global position is driven entirely by IPC.
 anchor = "bottom-right"
 margin_x = 50
 margin_y = 50
 layer = "overlay"
+# Subtle idle bob/wobble. Pure render-space offset (no compositor reconfigure),
+# so it does not cause jitter. Set to false to keep the sprite perfectly still.
+float = false
 
 [animation]
+procedural = true       # Continuous Shiro rig; false uses the original PNG strips.
 idle_fps = 8
 talking_fps = 12
-transition_ms = 200
+transition_ms = 180
 
 [speech_bubble]
 max_width = 300
-font_size = 14
-typewriter_speed = 30  # chars per second
+font_size = 15
+typewriter_speed = 60  # chars per second
 dismiss_delay = 3.0

@@ -38,16 +38,33 @@ BASELINE = 0.2
 DECAY_RATE = 0.005  # Per minute, how fast mood drifts toward baseline
 DECAY_INTERVAL = 30  # seconds
 
+# Apps that count as a "work session" for break/encouragement nudges.
+WORK_SESSION_APPS = {"code", "codium", "neovim", "nvim", "vim", "emacs", "jetbrains"}
+
 
 class MoodSystem:
     """Tracks and updates the buddy's mood value."""
 
-    def __init__(self, initial: float = 0.3) -> None:
+    def __init__(self, initial: float = 0.3, config: dict | None = None) -> None:
         self._value = max(-1.0, min(1.0, initial))
         self._last_decay = time.monotonic()
         # Track continuous work time
         self._work_start: float | None = None
-        self._work_apps = {"code", "codium", "neovim", "nvim", "vim", "emacs", "jetbrains"}
+
+        # Tunable parameters — read from config, defaulting to module constants.
+        cfg = config or {}
+        self.baseline: float = float(cfg.get("baseline", BASELINE))
+        self.decay_rate: float = float(cfg.get("decay_rate", DECAY_RATE))
+        self.decay_interval: float = float(cfg.get("decay_interval", DECAY_INTERVAL))
+        self._work_apps: set[str] = set(cfg.get("work_session_apps", WORK_SESSION_APPS))
+
+    def reconfigure(self, config: dict) -> None:
+        """Re-apply tunable parameters in place (does NOT reset the current mood)."""
+        cfg = config or {}
+        self.baseline = float(cfg.get("baseline", self.baseline))
+        self.decay_rate = float(cfg.get("decay_rate", self.decay_rate))
+        self.decay_interval = float(cfg.get("decay_interval", self.decay_interval))
+        self._work_apps = set(cfg.get("work_session_apps", self._work_apps))
 
     @property
     def value(self) -> float:
@@ -116,15 +133,15 @@ class MoodSystem:
     async def decay_loop(self) -> None:
         """Continuously decay mood toward baseline."""
         while True:
-            await asyncio.sleep(DECAY_INTERVAL)
+            await asyncio.sleep(self.decay_interval)
             elapsed_minutes = (time.monotonic() - self._last_decay) / 60.0
             self._last_decay = time.monotonic()
 
-            if abs(self._value - BASELINE) < 0.01:
+            if abs(self._value - self.baseline) < 0.01:
                 continue
 
-            decay_amount = DECAY_RATE * elapsed_minutes
-            if self._value > BASELINE:
-                self._value = max(BASELINE, self._value - decay_amount)
+            decay_amount = self.decay_rate * elapsed_minutes
+            if self._value > self.baseline:
+                self._value = max(self.baseline, self._value - decay_amount)
             else:
-                self._value = min(BASELINE, self._value + decay_amount)
+                self._value = min(self.baseline, self._value + decay_amount)

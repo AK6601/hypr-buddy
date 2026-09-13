@@ -43,7 +43,7 @@ class NotificationMonitor:
         """Connect to the session bus and monitor notifications."""
         try:
             from dbus_next.aio import MessageBus
-            from dbus_next import MessageType, BusType
+            from dbus_next import MessageType, BusType, Message
         except ImportError:
             logger.error("dbus-next not installed — notification monitoring disabled")
             # Stay alive (don't crash the task group) but do nothing
@@ -59,7 +59,7 @@ class NotificationMonitor:
                 # Subscribe to Notify method calls on the Notifications interface.
                 # We use the BecomeMonitor interface if available, otherwise match rules.
                 reply = await bus.call(
-                    bus.make_method_message(
+                    Message(
                         destination="org.freedesktop.DBus",
                         path="/org/freedesktop/DBus",
                         interface="org.freedesktop.DBus.Monitoring",
@@ -83,7 +83,7 @@ class NotificationMonitor:
                     )
                     # Fallback: use AddMatch rule (less reliable but works)
                     await bus.call(
-                        bus.make_method_message(
+                        Message(
                             destination="org.freedesktop.DBus",
                             path="/org/freedesktop/DBus",
                             interface="org.freedesktop.DBus",
@@ -93,16 +93,19 @@ class NotificationMonitor:
                                 "type='method_call',"
                                 "interface='org.freedesktop.Notifications',"
                                 "member='Notify'"
-                            ],
+                             ],
                         )
                     )
 
+                queue = asyncio.Queue()
+                def message_handler(msg):
+                    queue.put_nowait(msg)
+
+                bus.add_message_handler(message_handler)
+
                 # Process incoming messages
                 while True:
-                    msg = await bus.next_message()
-                    if msg is None:
-                        break
-
+                    msg = await queue.get()
                     if (
                         msg.member == "Notify"
                         and msg.interface == "org.freedesktop.Notifications"

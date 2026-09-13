@@ -63,14 +63,14 @@ fi
 
 # Send to brain and get response
 if command -v socat &>/dev/null; then
-    RESPONSE=$(echo "$MESSAGE" | socat -t5 - UNIX-CONNECT:"$CHAT_SOCKET" 2>/dev/null) || true
+    RESPONSE=$(echo "$MESSAGE" | socat -t180 - UNIX-CONNECT:"$CHAT_SOCKET" 2>/dev/null) || true
 elif command -v python3 &>/dev/null; then
     RESPONSE=$(python3 -c "
 import socket, sys
 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 s.connect('$CHAT_SOCKET')
 s.sendall((sys.argv[1] + '\n').encode())
-s.settimeout(30)
+s.settimeout(180)
 data = b''
 while True:
     chunk = s.recv(4096)

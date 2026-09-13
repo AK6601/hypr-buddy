@@ -35,6 +35,7 @@ class EventType(str, Enum):
     TIME = "time"
     MONITOR = "monitor"
     CURSOR_MOVE = "cursor_move"
+    SYSTEM_STATS = "system_stats"
 
 
 @dataclass

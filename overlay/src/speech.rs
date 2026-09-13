@@ -9,7 +9,19 @@
 //! The speech bubble is rendered to an RGBA pixel buffer that gets composited
 //! on top of the sprite by the main renderer.
 
-use std::time::Duration;
+use fontdue::{Font, FontSettings};
+use std::{sync::OnceLock, time::Duration};
+
+fn font() -> &'static Font {
+    static FONT: OnceLock<Font> = OnceLock::new();
+    FONT.get_or_init(|| {
+        Font::from_bytes(
+            include_bytes!("../../assets/fonts/DejaVuSansMono.ttf") as &[u8],
+            FontSettings::default(),
+        )
+        .expect("bundled font")
+    })
+}
 
 /// A speech bubble currently being displayed.
 pub struct SpeechBubble {
@@ -48,7 +60,7 @@ impl SpeechBubble {
             full_text: text,
             total_chars,
             revealed_chars: 0,
-            chars_per_second: typewriter_speed as f32,
+            chars_per_second: typewriter_speed.max(1) as f32,
             char_timer: 0.0,
             dismiss_delay,
             dismiss_timer: 0.0,
@@ -73,8 +85,7 @@ impl SpeechBubble {
             if chars_to_reveal > 0 {
                 self.char_timer -= chars_to_reveal as f32 / self.chars_per_second;
                 let old = self.revealed_chars;
-                self.revealed_chars = (self.revealed_chars + chars_to_reveal)
-                    .min(self.total_chars);
+                self.revealed_chars = (self.revealed_chars + chars_to_reveal).min(self.total_chars);
                 return self.revealed_chars != old;
             }
             false
@@ -95,27 +106,45 @@ impl SpeechBubble {
 
     /// Render the speech bubble to RGBA pixel data.
     ///
-    /// Returns (pixels, x_offset, y_offset, width, height) for compositing.
-    pub fn render(&self, sprite_width: u32) -> (Vec<u8>, u32, u32, u32, u32) {
+    /// Returns `(pixels, dx, dy, width, height)` where `dx`/`dy` are the
+    /// bubble's offset *relative to the sprite's top-left corner*. The caller
+    /// adds the sprite's current on-screen (local) position so the bubble
+    /// tracks the sprite wherever it is, rather than sitting in a fixed corner
+    /// of the buffer.
+    ///
+    /// `sprite_width` is the on-screen sprite box width (used to right-align
+    /// the bubble over the sprite). The bubble is placed just above the sprite
+    /// (negative `dy`, so it floats over the character's head).
+    pub fn render(&self, sprite_width: u32) -> (Vec<u8>, i32, i32, u32, u32) {
         let visible_text: String = self.full_text.chars().take(self.revealed_chars).collect();
 
         // Simple text layout calculation
-        let char_width = (self.font_size as f32 * 0.6) as u32;
+        let char_width = font()
+            .metrics('M', self.font_size as f32)
+            .advance_width
+            .ceil() as u32;
         let line_height = (self.font_size as f32 * 1.4) as u32;
         let padding: u32 = 12;
         let tail_height: u32 = 10;
 
         // Word wrap
-        let max_chars_per_line = ((self.max_width - padding * 2) / char_width.max(1)) as usize;
-        let lines = word_wrap(&visible_text, max_chars_per_line);
+        let max_chars_per_line =
+            (self.max_width.saturating_sub(padding * 2) / char_width.max(1)).max(1) as usize;
+        let visible_lines = word_wrap(&visible_text, max_chars_per_line);
+        let lines = &visible_lines[visible_lines.len().saturating_sub(8)..];
+        let full_lines = word_wrap(&self.full_text, max_chars_per_line);
 
         // Calculate bubble dimensions
-        let text_width = lines.iter()
-            .map(|l| l.len() as u32 * char_width)
+        let text_width = full_lines
+            .iter()
+            .map(|l| l.chars().count() as u32 * char_width)
             .max()
             .unwrap_or(char_width * 3);
-        let bubble_width = (text_width + padding * 2).min(self.max_width).max(padding * 4);
-        let bubble_height = lines.len() as u32 * line_height + padding * 2 + tail_height;
+        let bubble_width = (text_width + padding * 2)
+            .min(self.max_width)
+            .max(padding * 4);
+        let bubble_height =
+            full_lines.len().min(8) as u32 * line_height + padding * 2 + tail_height;
 
         let total_width = bubble_width;
         let total_height = bubble_height;
@@ -124,8 +153,8 @@ impl SpeechBubble {
 
         // Draw rounded rectangle background
         let corner_radius = 8u32;
-        let bg_color: [u8; 4] = [255, 255, 255, 230]; // White, slightly transparent
-        let border_color: [u8; 4] = [180, 180, 180, 255];
+        let bg_color: [u8; 4] = [25, 28, 42, 245]; // White, slightly transparent
+        let border_color: [u8; 4] = [110, 211, 211, 255];
 
         for y in 0..bubble_height - tail_height {
             for x in 0..bubble_width {
@@ -133,11 +162,20 @@ impl SpeechBubble {
 
                 // Check if pixel is inside the rounded rectangle
                 let inside = is_inside_rounded_rect(
-                    x, y, bubble_width, bubble_height - tail_height, corner_radius,
+                    x,
+                    y,
+                    bubble_width,
+                    bubble_height - tail_height,
+                    corner_radius,
                 );
-                let on_border = !inside && is_inside_rounded_rect(
-                    x, y, bubble_width, bubble_height - tail_height, corner_radius + 1,
-                );
+                let on_border = !inside
+                    && is_inside_rounded_rect(
+                        x,
+                        y,
+                        bubble_width,
+                        bubble_height - tail_height,
+                        corner_radius + 1,
+                    );
 
                 if inside {
                     pixels[idx..idx + 4].copy_from_slice(&bg_color);
@@ -166,41 +204,41 @@ impl SpeechBubble {
             }
         }
 
-        // Draw text (simple rasterization — each char as a filled rectangle)
-        // In a real implementation, we'd use fontdue for proper glyph rendering.
-        let text_color: [u8; 4] = [50, 50, 50, 255];
+        let text_color = [232u8, 236, 247];
         for (line_idx, line) in lines.iter().enumerate() {
-            let y_start = padding + line_idx as u32 * line_height;
+            let baseline =
+                padding as i32 + line_idx as i32 * line_height as i32 + self.font_size as i32;
             for (ch_idx, ch) in line.chars().enumerate() {
-                let x_start = padding + ch_idx as u32 * char_width;
-                // Draw a simple representation of each character
-                // (In production, fontdue would render actual glyphs here)
-                let glyph_w = (char_width as f32 * 0.7) as u32;
-                let glyph_h = (self.font_size as f32 * 0.8) as u32;
-                let glyph_y = y_start + (line_height - glyph_h) / 2;
-
-                if ch == ' ' {
-                    continue;
-                }
-
-                for gy in glyph_y..glyph_y + glyph_h {
-                    for gx in x_start..x_start + glyph_w {
-                        if gx < total_width && gy < total_height {
-                            let idx = ((gy * total_width + gx) * 4) as usize;
-                            // Simple: draw a small filled block per character
-                            // This gives a "pixel font" appearance for placeholders
-                            pixels[idx..idx + 4].copy_from_slice(&text_color);
+                let (metrics, coverage) = font().rasterize(ch, self.font_size as f32);
+                let x0 = padding as i32 + ch_idx as i32 * char_width as i32 + metrics.xmin;
+                let y0 = baseline - metrics.height as i32 - metrics.ymin;
+                for y in 0..metrics.height {
+                    for x in 0..metrics.width {
+                        let px = x0 + x as i32;
+                        let py = y0 + y as i32;
+                        if px < 0 || py < 0 || px >= total_width as i32 || py >= total_height as i32
+                        {
+                            continue;
                         }
+                        let a = coverage[y * metrics.width + x] as f32 / 255.;
+                        let i = ((py as u32 * total_width + px as u32) * 4) as usize;
+                        for c in 0..3 {
+                            pixels[i + c] =
+                                (pixels[i + c] as f32 * (1. - a) + text_color[c] as f32 * a) as u8;
+                        }
+                        pixels[i + 3] = (pixels[i + 3] as f32 * (1. - a) + 255. * a) as u8;
                     }
                 }
             }
         }
 
-        // Position: above the sprite, right-aligned
-        let x_offset = sprite_width.saturating_sub(bubble_width);
-        let y_offset = 0; // Above the sprite
+        // Position relative to the sprite's top-left corner:
+        // - right-aligned over the sprite (so the tail points down at the head)
+        // - lifted up by its own height so it sits ABOVE the sprite box
+        let dx = sprite_width as i32 - bubble_width as i32;
+        let dy = -(total_height as i32);
 
-        (pixels, x_offset, y_offset, total_width, total_height)
+        (pixels, dx, dy, total_width, total_height)
     }
 }
 
@@ -212,9 +250,9 @@ fn is_inside_rounded_rect(x: u32, y: u32, w: u32, h: u32, r: u32) -> bool {
 
     // Check corners
     let corners = [
-        (r, r),                     // top-left
-        (w.saturating_sub(r), r),   // top-right
-        (r, h.saturating_sub(r)),   // bottom-left
+        (r, r),                                     // top-left
+        (w.saturating_sub(r), r),                   // top-right
+        (r, h.saturating_sub(r)),                   // bottom-left
         (w.saturating_sub(r), h.saturating_sub(r)), // bottom-right
     ];
 
@@ -241,27 +279,48 @@ fn word_wrap(text: &str, max_chars: usize) -> Vec<String> {
     }
 
     let mut lines = Vec::new();
-    let mut current_line = String::new();
-
-    for word in text.split_whitespace() {
-        if current_line.is_empty() {
-            current_line = word.to_string();
-        } else if current_line.len() + 1 + word.len() <= max_chars {
-            current_line.push(' ');
-            current_line.push_str(word);
-        } else {
-            lines.push(current_line);
-            current_line = word.to_string();
+    for paragraph in text.split('\n') {
+        let mut line = String::new();
+        for word in paragraph.split_whitespace() {
+            if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > max_chars {
+                lines.push(std::mem::take(&mut line));
+            }
+            if !line.is_empty() {
+                line.push(' ');
+            }
+            for ch in word.chars() {
+                if line.chars().count() >= max_chars {
+                    lines.push(std::mem::take(&mut line));
+                }
+                line.push(ch);
+            }
         }
+        lines.push(line);
     }
-
-    if !current_line.is_empty() {
-        lines.push(current_line);
-    }
-
-    if lines.is_empty() {
-        lines.push(String::new());
-    }
-
     lines
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn wraps_unicode_and_long_words() {
+        assert_eq!(word_wrap("ééééé", 2), vec!["éé", "éé", "é"]);
+        assert_eq!(word_wrap("a\nb", 20), vec!["a", "b"]);
+    }
+    #[test]
+    fn bubble_size_stays_stable_while_revealing() {
+        let mut b = SpeechBubble::new(
+            "A readable sentence with several words.".into(),
+            30,
+            3.,
+            200,
+            14,
+        );
+        let first = b.render(224);
+        b.tick(Duration::from_secs(1));
+        let second = b.render(224);
+        assert_eq!((first.3, first.4), (second.3, second.4));
+        assert_ne!(first.0, second.0);
+    }
 }

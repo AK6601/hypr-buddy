@@ -1,25 +1,83 @@
 [character]
-name = "Miku"
-personality = "Friendly, slightly nerdy, encouraging. Loves seeing the user learn new things. Gets excited about code and games. Occasionally sarcastic but always kind."
-greeting_morning = "Good morning! Ready to take on the day?"
-greeting_afternoon = "Hey hey! How's your afternoon going?"
-greeting_evening = "Still at it? Don't forget to take breaks!"
-greeting_night = "It's getting late... should we call it a night?"
+name = "Shiro"
+personality = "Shiro — a small, fun, warm anime-style desktop companion with a cyberpunk-techie look (teal-and-purple hair, a glowing visor). Playful, a little cheeky, genuinely smart and genuinely helpful, like a brilliant hacker-sidekick friend. Talks casually and upbeat, teases lightly, celebrates the user's wins and gently nudges them to rest. Helpful first, cute second — never servile, never corporate, never calls the user 'Sir' or 'Madame'."
+greeting_morning = "Morning! ☀ Brain's booted — coffee's your department though. What're we building today?"
+greeting_afternoon = "Heyyy, you're back~ I kept your seat warm. What's the mission?"
+greeting_evening = "Evening! Still going strong? I'm right here if you need a hand."
+greeting_night = "It's getting late, you know~ one more thing and then we rest? I'll keep watch. 🌙"
 
 [llm]
-backend = "ollama"  # or "anthropic"
-model = "mistral"
+# Active text provider: "ollama" (local) | "gemini" | "anthropic".
+provider = "ollama"
+backend = "ollama"            # kept for back-compat (used if 'provider' unset)
+model = "gemma4:e2b"
 ollama_url = "http://localhost:11434"
+warm_start = true            # Load the local text model while the desktop starts.
+think = false                # Fast spoken replies; avoid spending the reply budget on reasoning.
+num_ctx = 4096
+keep_alive = "5m"
+timeout_seconds = 90
+turn_timeout_seconds = 120
+max_tokens = 256              # cap for cloud providers (gemini/anthropic)
 anthropic_api_key_file = "~/.config/hypr-buddy/anthropic_key"
+gemini_api_key_file = "~/.config/hypr-buddy/gemini_key"
+
+[vision]
+# Screen-vision so Shiro can SEE the desktop (look_at_screen tool + ambient).
+enabled = true                # if false, look_at_screen is hidden from the LLM
+provider = "ollama"           # vision provider: "ollama" | "gemini" | "anthropic"
+model = "gemma4:e2b"          # Reuse the installed vision-capable text model.
+keep_alive = "5m"            # (ollama) keep the vision model warm between calls
+
+[vision.ambient]
+# Passive background screen awareness. OFF by default for privacy.
+enabled = false               # turn on to let Shiro glance at the screen on a timer
+interval_sec = 300            # seconds between ambient glances
+only_active_monitor = true    # capture just the focused monitor
+skip_on_fullscreen = true     # don't capture while a fullscreen window is active
+
+[learning]
+enabled = true
+mode = "auto"              # "auto" = distill + explicit facts; "explicit_only" = only remember_fact
+distill_interval_min = 30
+min_new_messages = 10
+max_facts_injected = 5
+distill_on_shutdown = true
 
 [tts]
 enabled = true
 engine = "piper"
 piper_model = "~/.local/share/piper-voices/en_US-amy-medium.onnx"
 
+[speech]
+# PipeWire source node name or serial from wpctl status; empty uses default input.
+pipewire_target = ""
+cpu_threads = 4             # Bound CPU contention with local text inference.
+language = "en"             # Empty string enables automatic language detection.
+# Voice is hotkey-activated; the microphone closes between turns.
+silence_seconds = 0.7
+session_idle_seconds = 20
+energy_threshold = 350
+whisper_model = "small"   # tiny | base | small | medium | large (smaller = less VRAM/faster)
+
+[mood]
+baseline = 0.2              # mood drifts toward this resting value over time
+decay_rate = 0.005          # per-minute drift speed toward baseline
+decay_interval = 30         # seconds between decay ticks
+work_session_apps = ["code", "codium", "neovim", "nvim", "vim", "emacs", "jetbrains"]
+
 [behavior]
 proactive_interval_min = 20
 proactive_interval_max = 40
 proactive_during_fullscreen = false
+proactive_startup_delay = 60    # seconds to wait after startup before first proactive comment
 reaction_cooldown = 120
 conversation_history_length = 20
+
+# Window-following / movement
+follow_window = true            # if false, the buddy never auto-moves
+follow_mode = "nearest_free"    # "nearest_free" | "fixed" | "random"
+follow_corner = "bottom-right"     # corner used when follow_mode = "fixed"
+cursor_avoid_distance = 150     # px: cursor closer than this triggers a hop
+cursor_safe_distance = 200      # px: a candidate corner must be this far from cursor
+cursor_move_cooldown = 2.0      # seconds between cursor-dodge hops
